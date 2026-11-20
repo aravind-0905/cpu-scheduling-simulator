@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OSLab — CPU Scheduling Simulator</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1a2332;
+    --panel2: #243044;
+    --border: #2d3a4f;
+    --text: #e7ecf3;
+    --muted: #8b9bb4;
+    --accent: #3b82f6;
+    --accent2: #22d3ee;
+    --green: #34d399;
+    --orange: #fb923c;
+    --pink: #f472b6;
+    --purple: #a78bfa;
+    --red: #f87171;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+  header {
+    background: linear-gradient(90deg, #1e293b, #0f172a);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: grid; place-items: center;
+    font-weight: 800; font-size: 18px;
+  }
+  .brand h1 { font-size: 18px; font-weight: 700; }
+  .brand span { font-size: 12px; color: var(--muted); }
+  nav { display: flex; gap: 6px; background: var(--panel); padding: 4px; border-radius: 10px; }
+  nav button {
+    background: transparent; border: none; color: var(--muted);
+    padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 13px;
+    cursor: pointer; transition: .15s;
+  }
+  nav button:hover { color: var(--text); }
+  nav button.active { background: var(--accent); color: #fff; }
+  main { max-width: 1400px; margin: 0 auto; padding: 24px 20px 60px; }
+  .tab { display: none; }
+  .tab.active { display: block; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .panel h2 { font-size: 16px; margin-bottom: 4px; }
+  .hint { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  label { display: block; font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .04em; margin-bottom: 5px; }
+  select, input[type=number] {
+    background: var(--panel2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 8px; padding: 9px 12px;
+    font-size: 14px; min-width: 90px;
+  }
+  select { min-width: 260px; }
+  button {
+    background: var(--panel2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 8px; padding: 9px 14px;
+    font-weight: 600; font-size: 13px; cursor: pointer; transition: .15s;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { background: #2563eb; }
+  button.danger { color: var(--red); border-color: #7f1d1d; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-size: 11px; letter-spacing: .05em; padding: 10px 12px; background: var(--panel2); }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  td input { width: 70px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 6px 8px; }
+  .pid { font-weight: 700; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .gantt-wrap { overflow-x: auto; margin: 12px 0; }
+  .gantt {
+    display: flex; height: 52px; border-radius: 8px; overflow: hidden;
+    border: 1px solid var(--border); min-width: 100%;
+  }
+  .gantt .block {
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 12px; font-weight: 700; min-width: 28px;
+    border-right: 2px solid var(--bg);
+  }
+  .ticks { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-family: ui-monospace, monospace; margin-top: 4px; }
+  .stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px; margin: 16px 0;
+  }
+  .stat {
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 14px;
+  }
+  .stat small { display: block; color: var(--muted); font-size: 11px; margin-bottom: 4px; }
+  .stat strong { font-size: 20px; color: var(--accent2); }
+  .error { color: var(--red); font-size: 13px; margin-top: 8px; }
+  .algo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+  .algo-card {
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px;
+  }
+  .algo-card h3 { font-size: 15px; margin-bottom: 8px; color: var(--accent2); }
+  .algo-card p { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .algo-card ul { font-size: 12.5px; padding-left: 16px; color: #a8b8d0; }
+  .algo-card li { margin-bottom: 3px; }
+  .tag {
+    display: inline-block; font-size: 10px; font-weight: 700;
+    padding: 2px 7px; border-radius: 5px; margin-right: 4px;
+  }
+  .tag.np { background: #1e3a5f; color: #93c5fd; }
+  .tag.p { background: #3b1f4a; color: #e9d5ff; }
+  pre {
+    background: #0d1117; color: #c9d1d9; border-radius: 10px;
+    padding: 16px; overflow: auto; font-size: 12.5px; line-height: 1.45;
+    border: 1px solid var(--border); max-height: 520px;
+  }
+  .code-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
+  .compare-table th, .compare-table td { text-align: center; }
+  .compare-table td:first-child, .compare-table th:first-child { text-align: left; }
+  .hidden { display: none !important; }
+  @media (max-width: 700px) {
+    header { flex-direction: column; gap: 10px; align-items: flex-start; }
+    nav { width: 100%; overflow-x: auto; }
+    select { min-width: 100%; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo">OS</div>
+    <div>
+      <h1>OSLab</h1>
+      <span>CPU Scheduling Simulator</span>
+    </div>
+  </div>
+  <nav>
+    <button class="active" data-tab="sim">Simulator</button>
+    <button data-tab="compare">Compare</button>
+    <button data-tab="algo">Algorithms</button>
+    <button data-tab="code">C Code</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ========== SIMULATOR ========== -->
+  <section id="sim" class="tab active">
+    <div class="panel">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <label for="algo">Scheduling Algorithm</label>
+          <select id="algo">
+            <option value="fcfs">FCFS — First Come First Served</option>
+            <option value="sjf">SJF — Shortest Job First (Non-preemptive)</option>
+            <option value="srtf">SRTF — Shortest Remaining Time First</option>
+            <option value="priority">Priority (Non-preemptive)</option>
+            <option value="priority_p">Priority (Preemptive)</option>
+            <option value="rr">Round Robin</option>
+          </select>
+        </div>
+        <div id="quantumBox" class="hidden">
+          <label for="quantum">Time Quantum</label>
+          <input type="number" id="quantum" min="1" value="2">
+        </div>
+        <div class="actions">
+          <button id="btnPreset">Load Preset</button>
+          <button id="btnRandom">Randomize</button>
+          <button class="primary" id="btnRun">▶ Run Simulation</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+        <div>
+          <h2>Process Table</h2>
+          <p class="hint" style="margin:0">Arrival, Burst & Priority (lower number = higher priority)</p>
+        </div>
+        <div class="actions">
+          <button id="btnAdd">+ Add Process</button>
+          <button class="danger" id="btnClear">Clear</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr><th>PID</th><th>Arrival (AT)</th><th>Burst (BT)</th><th>Priority</th><th></th></tr>
+          </thead>
+          <tbody id="procBody"></tbody>
+        </table>
+      </div>
+      <div id="err" class="error"></div>
+    </div>
+
+    <div class="panel hidden" id="results">
+      <h2>Execution Timeline</h2>
+      <p class="hint" id="summary"></p>
+      <div class="gantt-wrap">
+        <div class="gantt" id="gantt"></div>
+        <div class="ticks" id="ticks"></div>
+      </div>
+      <div class="stats" id="stats"></div>
+      <h2 style="margin-top:18px;margin-bottom:10px">Per-Process Metrics</h2>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr><th>PID</th><th>AT</th><th>BT</th><th>CT</th><th>TAT</th><th>WT</th><th>RT</th></tr>
+          </thead>
+          <tbody id="resBody"></tbody>
+        </table>
+      </div>
+      <div class="actions" style="margin-top:14px">
+        <button id="btnRerun">↻ Run Again</button>
+        <button id="btnExport">↓ Export CSV</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== COMPARE ========== -->
+  <section id="compare" class="tab">
+    <div class="panel">
+      <h2>Compare All Algorithms</h2>
+      <p class="hint">Runs the current process set through every supported algorithm and ranks them by average waiting time.</p>
+      <button class="primary" id="btnCompare">Compare All</button>
+      <div id="compareOut" style="margin-top:18px"></div>
+    </div>
+  </section>
+
+  <!-- ========== ALGORITHMS ========== -->
+  <section id="algo" class="tab">
+    <div class="panel">
+      <h2>Scheduling Algorithms Guide</h2>
+      <p class="hint">Quick reference for the policies available in this simulator.</p>
+      <div class="algo-grid">
+        <div class="algo-card">
+          <h3>FCFS <span class="tag np">Non-preemptive</span></h3>
+          <p>Processes run in the exact order they arrive. Simple and fair by arrival time.</p>
+          <ul>
+            <li>No starvation</li>
+            <li>Suffer from convoy effect</li>
+            <li>High average waiting time for mixed workloads</li>
+          </ul>
+        </div>
+        <div class="algo-card">
+          <h3>SJF <span class="tag np">Non-preemptive</span></h3>
+          <p>Always picks the ready process with the shortest burst time.</p>
+          <ul>
+            <li>Optimal average waiting time (when BT known)</li>
+            <li>Can starve long jobs</li>
+            <li>Needs accurate burst estimates</li>
+          </ul>
+        </div>
+        <div class="algo-card">
+          <h3>SRTF <span class="tag p">Preemptive</span></h3>
+          <p>Preemptive version of SJF. Switches whenever a shorter job arrives.</p>
+          <ul>
+            <li>Best average waiting time among preemptive policies</li>
+            <li>More context switches</li>
+            <li>Still needs burst-time knowledge</li>
+          </ul>
+        </div>
+        <div class="algo-card">
+          <h3>Priority (NP) <span class="tag np">Non-preemptive</span></h3>
+          <p>Selects the highest-priority ready process (lower number = higher priority).</p>
+          <ul>
+            <li>Important jobs can be preferred</li>
+            <li>Low-priority processes may starve</li>
+            <li>Aging can be added to fix starvation</li>
+          </ul>
+        </div>
+        <div class="algo-card">
+          <h3>Priority (P) <span class="tag p">Preemptive</span></h3>
+          <p>Preempts the running process if a higher-priority process arrives.</p>
+          <ul>
+            <li>Better response for high-priority jobs</li>
+            <li>Higher overhead</li>
+            <li>Starvation still possible without aging</li>
+          </ul>
+        </div>
+        <div class="algo-card">
+          <h3>Round Robin <span class="tag p">Preemptive</span></h3>
+          <p>Each process gets a fixed time quantum in cyclic order.</p>
+          <ul>
+            <li>Excellent response time & fairness</li>
+            <li>Performance depends heavily on quantum size</li>
+            <li>Ideal for time-sharing systems</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== C CODE ========== -->
+  <section id="code" class="tab">
+    <div class="panel">
+      <h2>C Reference Implementations</h2>
+      <p class="hint">Self-contained programs you can compile and run. Select an algorithm below.</p>
+      <div class="code-bar">
+        <label for="codeSel" style="margin:0">Show code for</label>
+        <select id="codeSel">
+          <option value="fcfs">FCFS</option>
+          <option value="sjf">SJF</option>
+          <option value="srtf">SRTF</option>
+          <option value="priority">Priority (NP)</option>
+          <option value="rr">Round Robin</option>
+          <option value="compare">Compare All</option>
+        </select>
+      </div>
+      <pre id="cCode"></pre>
+    </div>
+  </section>
+</main>
+
+<script>
+const COLORS = ['#3b82f6','#f472b6','#34d399','#a78bfa','#fb923c','#22d3ee','#f87171','#eab308'];
+let processes = [
+  {pid:'P1', at:0, bt:5, pr:2},
+  {pid:'P2', at:1, bt:3, pr:1},
+  {pid:'P3', at:2, bt:8, pr:3},
+  {pid:'P4', at:3, bt:6, pr:2}
+];
+let last = null;
+const $ = id => document.getElementById(id);
+
+/* ---------- UI helpers ---------- */
+function renderTable() {
+  const body = $('procBody');
+  if (!processes.length) {
+    body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">No processes — click Add Process</td></tr>';
+    return;
+  }
+  body.innerHTML = processes.map((p,i) => `
+    <tr>
+      <td class="pid"><span class="dot" style="background:${COLORS[i%COLORS.length]}"></span>${p.pid}</td>
+      <td><input type="number" min="0" value="${p.at}" data-i="${i}" data-k="at"></td>
+      <td><input type="number" min="1" value="${p.bt}" data-i="${i}" data-k="bt"></td>
+      <td><input type="number" min="1" value="${p.pr}" data-i="${i}" data-k="pr"></td>
+      <td><button class="danger" data-del="${i}">✕</button></td>
+    </tr>`).join('');
+  body.querySelectorAll('input').forEach(el => {
+    el.onchange = e => {
+      const i = +e.target.dataset.i, k = e.target.dataset.k;
+      processes[i][k] = Math.max(k === 'at' ? 0 : 1, parseInt(e.target.value) || 0);
+    };
+  });
+  body.querySelectorAll('[data-del]').forEach(el => {
+    el.onclick = () => { processes.splice(+el.dataset.del, 1); renderTable(); };
+  });
+}
+
+function validate() {
+  if (!processes.length) return 'Add at least one process.';
+  for (const p of processes) {
+    if (!Number.isInteger(p.at) || p.at < 0) return 'Arrival time must be ≥ 0.';
+    if (!Number.isInteger(p.bt) || p.bt < 1) return 'Burst time must be ≥ 1.';
+    if (!Number.isInteger(p.pr) || p.pr < 1) return 'Priority must be ≥ 1.';
+  }
+  return '';
+}
+
+/* ---------- Core simulator ---------- */
+function simulate(kind, list = processes, quantum = +$('quantum').value || 2) {
+  const jobs = list.map((p, i) => ({
+    ...p, idx: i, rem: p.bt, first: null, ct: null
+  }));
+  const segments = [];
+  let time = 0;
+  const add = (j, s, e) => { if (e > s) segments.push({ pid: j.pid, start: s, end: e, idx: j.idx }); };
+
+  if (kind === 'rr') {
+    const ready = [];
+    const arr = [...jobs].sort((a,b) => a.at - b.at || a.idx - b.idx);
+    let next = 0, guard = 0;
+    while (jobs.some(j => j.rem > 0) && guard++ < 200000) {
+      while (next < arr.length && arr[next].at <= time) ready.push(arr[next++]);
+      if (!ready.length) { time = arr[next].at; continue; }
+      const j = ready.shift();
+      if (j.first === null) j.first = time;
+      const run = Math.min(quantum, j.rem);
+      const start = time;
+      time += run; j.rem -= run;
+      add(j, start, time);
+      while (next < arr.length && arr[next].at <= time) ready.push(arr[next++]);
+      if (j.rem > 0) ready.push(j);
+      else j.ct = time;
+    }
+  } else if (kind === 'srtf' || kind === 'priority_p') {
+    // Preemptive
+    let guard = 0;
+    while (jobs.some(j => j.rem > 0) && guard++ < 200000) {
+      const ready = jobs.filter(j => j.rem > 0 && j.at <= time);
+      if (!ready.length) {
+        time = Math.min(...jobs.filter(j => j.rem > 0).map(j => j.at));
+        continue;
+      }
+      let chosen;
+      if (kind === 'srtf') {
+        chosen = ready.sort((a,b) => a.rem - b.rem || a.at - b.at || a.idx - b.idx)[0];
+      } else {
+        chosen = ready.sort((a,b) => a.pr - b.pr || a.at - b.at || a.idx - b.idx)[0];
+      }
+      if (chosen.first === null) chosen.first = time;
+      // run for 1 unit then re-evaluate
+      const start = time;
+      time += 1; chosen.rem -= 1;
+      add(chosen, start, time);
+      if (chosen.rem === 0) chosen.ct = time;
+    }
+  } else {
+    // Non-preemptive: fcfs, sjf, priority
+    const done = new Set();
+    let guard = 0;
+    while (done.size < jobs.length && guard++ < jobs.length + 10) {
+      let ready = jobs.filter(j => !done.has(j.idx) && j.at <= time);
+      if (!ready.length) {
+        time = Math.min(...jobs.filter(j => !done.has(j.idx)).map(j => j.at));
+        ready = jobs.filter(j => !done.has(j.idx) && j.at <= time);
+      }
+      let chosen;
+      if (kind === 'sjf') {
+        chosen = ready.sort((a,b) => a.bt - b.bt || a.at - b.at || a.idx - b.idx)[0];
+      } else if (kind === 'priority') {
+        chosen = ready.sort((a,b) => a.pr - b.pr || a.at - b.at || a.idx - b.idx)[0];
+      } else {
+        chosen = ready.sort((a,b) => a.at - b.at || a.idx - b.idx)[0];
+      }
+      if (chosen.first === null) chosen.first = time;
+      const start = time;
+      time += chosen.bt;
+      chosen.ct = time;
+      chosen.rem = 0;
+      add(chosen, start, time);
+      done.add(chosen.idx);
+    }
+  }
+
+  // merge consecutive same-pid segments
+  const merged = [];
+  for (const s of segments) {
+    if (merged.length && merged[merged.length-1].pid === s.pid && merged[merged.length-1].end === s.start) {
+      merged[merged.length-1].end = s.end;
+    } else merged.push({...s});
+  }
+
+  const rows = jobs.map(j => ({
+    ...j,
+    tat: j.ct - j.at,
+    wt: j.ct - j.at - j.bt,
+    rt: j.first - j.at
+  }));
+  const start = Math.min(...jobs.map(j => j.at));
+  const end = Math.max(...jobs.map(j => j.ct));
+  const busy = merged.reduce((s,x) => s + x.end - x.start, 0);
+  return {
+    rows, segments: merged, start, end,
+    avgT: rows.reduce((s,r) => s + r.tat, 0) / rows.length,
+    avgW: rows.reduce((s,r) => s + r.wt, 0) / rows.length,
+    avgR: rows.reduce((s,r) => s + r.rt, 0) / rows.length,
+    util: 100 * busy / (end - start || 1)
+  };
+}
+
+function showResults(r, name) {
+  last = r;
+  $('results').classList.remove('hidden');
+  $('summary').textContent = `${name} · ${r.rows.length} processes · elapsed ${r.end - r.start} units`;
+  const span = Math.max(1, r.end - r.start);
+  $('gantt').innerHTML = r.segments.map(s =>
+    `<div class="block" title="${s.pid}: ${s.start}–${s.end}" style="width:${(s.end-s.start)/span*100}%;background:${COLORS[s.idx%COLORS.length]}">${s.pid}</div>`
+  ).join('');
+  $('ticks').innerHTML = `<span>${r.start}</span>` + r.segments.map(s => `<span>${s.end}</span>`).join('');
+  $('stats').innerHTML = [
+    ['Avg Turnaround', r.avgT.toFixed(2)],
+    ['Avg Waiting', r.avgW.toFixed(2)],
+    ['Avg Response', r.avgR.toFixed(2)],
+    ['CPU Utilisation', r.util.toFixed(1) + '%']
+  ].map(([k,v]) => `<div class="stat"><small>${k}</small><strong>${v}</strong></div>`).join('');
+  $('resBody').innerHTML = r.rows.map(p =>
+    `<tr><td><b>${p.pid}</b></td><td>${p.at}</td><td>${p.bt}</td><td>${p.ct}</td><td>${p.tat}</td><td>${p.wt}</td><td>${p.rt}</td></tr>`
+  ).join('');
+}
+
+/* ---------- Event wiring ---------- */
+$('algo').onchange = () => {
+  const v = $('algo').value;
+  $('quantumBox').classList.toggle('hidden', v !== 'rr');
+};
+$('btnAdd').onclick = () => {
+  const next = processes.length ? Math.max(...processes.map(p => +p.pid.slice(1))) + 1 : 1;
+  processes.push({pid:'P'+next, at:0, bt:1, pr:1});
+  renderTable();
+};
+$('btnClear').onclick = () => { processes = []; renderTable(); $('results').classList.add('hidden'); };
+$('btnPreset').onclick = () => {
+  processes = [
+    {pid:'P1',at:0,bt:5,pr:2},{pid:'P2',at:1,bt:3,pr:1},
+    {pid:'P3',at:2,bt:8,pr:3},{pid:'P4',at:3,bt:6,pr:2}
+  ];
+  renderTable();
+};
+$('btnRandom').onclick = () => {
+  const n = 4 + Math.floor(Math.random()*3);
+  processes = Array.from({length:n}, (_,i) => ({
+    pid: 'P'+(i+1),
+    at: Math.floor(Math.random()*6),
+    bt: 1 + Math.floor(Math.random()*9),
+    pr: 1 + Math.floor(Math.random()*5)
+  }));
+  renderTable();
+};
+$('btnRun').onclick = () => {
+  const e = validate();
+  $('err').textContent = e;
+  if (e) return;
+  const k = $('algo').value;
+  if (k === 'rr' && (!Number.isInteger(+$('quantum').value) || +$('quantum').value < 1)) {
+    $('err').textContent = 'Time quantum must be a positive integer.';
+    return;
+  }
+  const name = $('algo').selectedOptions[0].text;
+  showResults(simulate(k), name);
+};
+$('btnRerun').onclick = () => $('btnRun').click();
+$('btnExport').onclick = () => {
+  if (!last) return;
+  const csv = 'PID,AT,BT,CT,TAT,WT,RT\n' + last.rows.map(p =>
+    [p.pid,p.at,p.bt,p.ct,p.tat,p.wt,p.rt].join(',')
+  ).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+  a.download = 'scheduling-results.csv';
+  a.click();
+};
+
+$('btnCompare').onclick = () => {
+  const e = validate();
+  if (e) { $('compareOut').innerHTML = `<p class="error">${e}</p>`; return; }
+  const q = Math.max(1, +$('quantum').value || 2);
+  const algs = [
+    ['fcfs','FCFS'],['sjf','SJF'],['srtf','SRTF'],
+    ['priority','Priority (NP)'],['priority_p','Priority (P)'],['rr','Round Robin']
+  ];
+  const data = algs.map(([k,n]) => ({name:n, ...simulate(k, processes, q)}));
+  data.sort((a,b) => a.avgW - b.avgW);
+  $('compareOut').innerHTML = `
+    <div style="overflow-x:auto">
+      <table class="compare-table">
+        <thead><tr><th>Rank</th><th>Algorithm</th><th>Avg TAT</th><th>Avg WT</th><th>Avg RT</th><th>CPU %</th></tr></thead>
+        <tbody>
+          ${data.map((d,i) => `<tr>
+            <td>${i+1}</td><td><b>${d.name}</b></td>
+            <td>${d.avgT.toFixed(2)}</td><td>${d.avgW.toFixed(2)}</td>
+            <td>${d.avgR.toFixed(2)}</td><td>${d.util.toFixed(1)}%</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    <p class="hint" style="margin-top:12px">Sorted by average waiting time (best first).</p>`;
+};
+
+/* ---------- C Code ---------- */
+const SNIPPETS = {
+fcfs: `#include <stdio.h>
+#define MAX 20
+int main(void) {
+    int n, i, time = 0;
+    int at[MAX], bt[MAX], ct[MAX], tat[MAX], wt[MAX];
+    float avgT = 0, avgW = 0;
+    printf("n = "); scanf("%d", &n);
+    for (i = 0; i < n; i++) {
+        printf("P%d AT BT: ", i+1);
+        scanf("%d%d", &at[i], &bt[i]);
+    }
+    for (i = 0; i < n; i++) {
+        if (time < at[i]) time = at[i];
+        time += bt[i];
+        ct[i] = time; tat[i] = ct[i]-at[i]; wt[i] = tat[i]-bt[i];
+        avgT += tat[i]; avgW += wt[i];
+    }
+    printf("\\nPID AT BT CT TAT WT\\n");
+    for (i = 0; i < n; i++)
+        printf("P%d %d %d %d %d %d\\n", i+1, at[i], bt[i], ct[i], tat[i], wt[i]);
+    printf("Avg TAT = %.2f  Avg WT = %.2f\\n", avgT/n, avgW/n);
+    return 0;
+}`,
+
+sjf: `#include <stdio.h>
+#include <limits.h>
+#define MAX 20
+int main(void) {
+    int n, i, done[MAX]={0}, completed=0, time=0;
+    int at[MAX], bt[MAX], ct[MAX], tat[MAX], wt[MAX];
+    float avgT=0, avgW=0;
+    printf("n = "); scanf("%d", &n);
+    for (i=0;i<n;i++){ printf("P%d AT BT: ",i+1); scanf("%d%d",&at[i],&bt[i]); }
+    while (completed < n) {
+        int idx=-1, minb=INT_MAX;
+        for (i=0;i<n;i++)
+            if (!done[i] && at[i]<=time && bt[i]<minb){ minb=bt[i]; idx=i; }
+        if (idx==-1){
+            int nxt=INT_MAX;
+            for (i=0;i<n;i++) if (!done[i] && at[i]<nxt) nxt=at[i];
+            time=nxt; continue;
+        }
+        time += bt[idx];
+        ct[idx]=time; tat[idx]=ct[idx]-at[idx]; wt[idx]=tat[idx]-bt[idx];
+        avgT+=tat[idx]; avgW+=wt[idx];
+        done[idx]=1; completed++;
+    }
+    printf("\\nPID AT BT CT TAT WT\\n");
+    for (i=0;i<n;i++)
+        printf("P%d %d %d %d %d %d\\n",i+1,at[i],bt[i],ct[i],tat[i],wt[i]);
+    printf("Avg TAT = %.2f  Avg WT = %.2f\\n", avgT/n, avgW/n);
+    return 0;
+}`,
+
+srtf: `#include <stdio.h>
+#include <limits.h>
+#define MAX 20
+int main(void) {
+    int n, i, time=0, completed=0;
+    int at[MAX], bt[MAX], rem[MAX], ct[MAX], tat[MAX], wt[MAX], first[MAX];
+    float avgT=0, avgW=0;
+    printf("n = "); scanf("%d", &n);
+    for (i=0;i<n;i++){
+        printf("P%d AT BT: ",i+1);
+        scanf("%d%d",&at[i],&bt[i]);
+        rem[i]=bt[i]; first[i]=-1;
+    }
+    while (completed < n) {
+        int idx=-1, minr=INT_MAX;
+        for (i=0;i<n;i++)
+            if (rem[i]>0 && at[i]<=time && rem[i]<minr){ minr=rem[i]; idx=i; }
+        if (idx==-1){
+            int nxt=INT_MAX;
+            for (i=0;i<n;i++) if (rem[i]>0 && at[i]<nxt) nxt=at[i];
+            time=nxt; continue;
+        }
+        if (first[idx]==-1) first[idx]=time;
+        rem[idx]--; time++;
+        if (rem[idx]==0){
+            ct[idx]=time; tat[idx]=ct[idx]-at[idx]; wt[idx]=tat[idx]-bt[idx];
+            avgT+=tat[idx]; avgW+=wt[idx]; completed++;
+        }
+    }
+    printf("\\nPID AT BT CT TAT WT\\n");
+    for (i=0;i<n;i++)
+        printf("P%d %d %d %d %d %d\\n",i+1,at[i],bt[i],ct[i],tat[i],wt[i]);
+    printf("Avg TAT = %.2f  Avg WT = %.2f\\n", avgT/n, avgW/n);
+    return 0;
+}`,
+
+priority: `#include <stdio.h>
+#include <limits.h>
+#define MAX 20
+int main(void) {
+    int n, i, done[MAX]={0}, completed=0, time=0;
+    int at[MAX], bt[MAX], pr[MAX], ct[MAX], tat[MAX], wt[MAX];
+    float avgT=0, avgW=0;
+    printf("n = "); scanf("%d", &n);
+    for (i=0;i<n;i++){
+        printf("P%d AT BT Priority: ",i+1);
+        scanf("%d%d%d",&at[i],&bt[i],&pr[i]);
+    }
+    while (completed < n) {
+        int idx=-1, best=INT_MAX;
+        for (i=0;i<n;i++)
+            if (!done[i] && at[i]<=time &&
+               (pr[i]<best || (pr[i]==best && at[i]<at[idx]))) {
+                best=pr[i]; idx=i;
+            }
+        if (idx==-1){
+            int nxt=INT_MAX;
+            for (i=0;i<n;i++) if (!done[i] && at[i]<nxt) nxt=at[i];
+            time=nxt; continue;
+        }
+        time += bt[idx];
+        ct[idx]=time; tat[idx]=ct[idx]-at[idx]; wt[idx]=tat[idx]-bt[idx];
+        avgT+=tat[idx]; avgW+=wt[idx];
+        done[idx]=1; completed++;
+    }
+    printf("\\nPID AT BT PR CT TAT WT\\n");
+    for (i=0;i<n;i++)
+        printf("P%d %d %d %d %d %d %d\\n",i+1,at[i],bt[i],pr[i],ct[i],tat[i],wt[i]);
+    printf("Avg TAT = %.2f  Avg WT = %.2f\\n", avgT/n, avgW/n);
+    return 0;
+}`,
+
+rr: `#include <stdio.h>
+#define MAX 20
+int main(void) {
+    int n, q, i, time=0, completed=0;
+    int at[MAX], bt[MAX], rem[MAX], ct[MAX], tat[MAX], wt[MAX];
+    int queue[MAX*4], front=0, rear=0, inq[MAX]={0};
+    float avgT=0, avgW=0;
+    printf("n = "); scanf("%d", &n);
+    printf("Quantum = "); scanf("%d", &q);
+    for (i=0;i<n;i++){
+        printf("P%d AT BT: ",i+1);
+        scanf("%d%d",&at[i],&bt[i]);
+        rem[i]=bt[i];
+        if (at[i]==0){ queue[rear++]=i; inq[i]=1; }
+    }
+    while (completed < n) {
+        if (front==rear){
+            int nxt=1e9;
+            for (i=0;i<n;i++) if (rem[i]>0 && at[i]<nxt) nxt=at[i];
+            time=nxt;
+            for (i=0;i<n;i++)
+                if (rem[i]>0 && at[i]<=time && !inq[i]){ queue[rear++]=i; inq[i]=1; }
+            continue;
+        }
+        int idx = queue[front++];
+        int run = rem[idx] < q ? rem[idx] : q;
+        time += run; rem[idx] -= run;
+        for (i=0;i<n;i++)
+            if (rem[i]>0 && at[i]<=time && !inq[i] && i!=idx){
+                queue[rear++]=i; inq[i]=1;
+            }
+        if (rem[idx]>0) queue[rear++]=idx;
+        else {
+            ct[idx]=time; tat[idx]=ct[idx]-at[idx]; wt[idx]=tat[idx]-bt[idx];
+            avgT+=tat[idx]; avgW+=wt[idx];
+            inq[idx]=0; completed++;
+        }
+    }
+    printf("\\nPID AT BT CT TAT WT\\n");
+    for (i=0;i<n;i++)
+        printf("P%d %d %d %d %d %d\\n",i+1,at[i],bt[i],ct[i],tat[i],wt[i]);
+    printf("Avg TAT = %.2f  Avg WT = %.2f\\n", avgT/n, avgW/n);
+    return 0;
+}`,
+
+compare: `/* Run FCFS, SJF, Priority & RR on the same input and print averages */
+#include <stdio.h>
+#include <limits.h>
+#include <string.h>
+#define MAX 20
+typedef struct { int at,bt,pr,ct,tat,wt; } P;
+void copy(P *d,P *s,int n){ memcpy(d,s,n*sizeof(P)); }
+void avgs(P *p,int n,float *t,float *w){
+    *t=*w=0; for(int i=0;i<n;i++){*t+=p[i].tat;*w+=p[i].wt;} *t/=n;*w/=n;
+}
+void fcfs(P *p,int n){
+    int t=0; for(int i=0;i<n;i++){ if(t<p[i].at)t=p[i].at; t+=p[i].bt;
+        p[i].ct=t; p[i].tat=t-p[i].at; p[i].wt=p[i].tat-p[i].bt; }
+}
+void sjf(P *p,int n){
+    int done[MAX]={0},c=0,t=0;
+    while(c<n){ int idx=-1,mb=INT_MAX;
+        for(int i=0;i<n;i++) if(!done[i]&&p[i].at<=t&&p[i].bt<mb){mb=p[i].bt;idx=i;}
+        if(idx==-1){int nx=INT_MAX;for(int i=0;i<n;i++)if(!done[i]&&p[i].at<nx)nx=p[i].at;t=nx;continue;}
+        t+=p[idx].bt; p[idx].ct=t; p[idx].tat=t-p[idx].at; p[idx].wt=p[idx].tat-p[idx].bt;
+        done[idx]=1;c++;
+    }
+}
+void priority(P *p,int n){
+    int done[MAX]={0},c=0,t=0;
+    while(c<n){ int idx=-1,bp=INT_MAX;
+        for(int i=0;i<n;i++) if(!done[i]&&p[i].at<=t&&(p[i].pr<bp||(p[i].pr==bp&&p[i].at<p[idx].at))){bp=p[i].pr;idx=i;}
+        if(idx==-1){int nx=INT_MAX;for(int i=0;i<n;i++)if(!done[i]&&p[i].at<nx)nx=p[i].at;t=nx;continue;}
+        t+=p[idx].bt; p[idx].ct=t; p[idx].tat=t-p[idx].at; p[idx].wt=p[idx].tat-p[idx].bt;
+        done[idx]=1;c++;
+    }
+}
+void rr(P *p,int n,int q){
+    int rem[MAX],inq[MAX]={0},qu[MAX*4],f=0,r=0,t=0,c=0;
+    for(int i=0;i<n;i++){rem[i]=p[i].bt;if(p[i].at==0){qu[r++]=i;inq[i]=1;}}
+    while(c<n){
+        if(f==r){int nx=1e9;for(int i=0;i<n;i++)if(rem[i]>0&&p[i].at<nx)nx=p[i].at;t=nx;
+            for(int i=0;i<n;i++)if(rem[i]>0&&p[i].at<=t&&!inq[i]){qu[r++]=i;inq[i]=1;}continue;}
+        int idx=qu[f++], run=rem[idx]<q?rem[idx]:q; t+=run; rem[idx]-=run;
+        for(int i=0;i<n;i++)if(rem[i]>0&&p[i].at<=t&&!inq[i]&&i!=idx){qu[r++]=i;inq[i]=1;}
+        if(rem[idx]>0) qu[r++]=idx;
+        else{p[idx].ct=t;p[idx].tat=t-p[idx].at;p[idx].wt=p[idx].tat-p[idx].bt;inq[idx]=0;c++;}
+    }
+}
+int main(void){
+    int n,q; P orig[MAX],w[MAX]; float t,wt;
+    printf("n Quantum: "); scanf("%d%d",&n,&q);
+    for(int i=0;i<n;i++){printf("P%d AT BT PR: ",i+1);scanf("%d%d%d",&orig[i].at,&orig[i].bt,&orig[i].pr);}
+    printf("\\nAlgo\\t\\tAvgTAT\\tAvgWT\\n");
+    copy(w,orig,n);fcfs(w,n);avgs(w,n,&t,&wt);printf("FCFS\\t\\t%.2f\\t%.2f\\n",t,wt);
+    copy(w,orig,n);sjf(w,n);avgs(w,n,&t,&wt);printf("SJF\\t\\t%.2f\\t%.2f\\n",t,wt);
+    copy(w,orig,n);priority(w,n);avgs(w,n,&t,&wt);printf("Priority\\t%.2f\\t%.2f\\n",t,wt);
+    copy(w,orig,n);rr(w,n,q);avgs(w,n,&t,&wt);printf("RoundRobin\\t%.2f\\t%.2f\\n",t,wt);
+    return 0;
+}`
+};
+
+$('codeSel').onchange = e => { $('cCode').textContent = SNIPPETS[e.target.value]; };
+$('cCode').textContent = SNIPPETS.fcfs;
+
+/* ---------- Tabs ---------- */
+document.querySelectorAll('nav button').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b === btn));
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.id === btn.dataset.tab));
+  };
+});
+
+renderTable();
+</script>
+</body>
+</html>
